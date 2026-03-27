@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace TranslationSdk\Services;
 
-use Countable;
 use Illuminate\Contracts\Translation\Loader;
 use Illuminate\Translation\Translator as LaravelTranslator;
 use Throwable;
@@ -31,20 +30,16 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
 
     private PassiveCollector $passiveCollector;
 
-    private ModuleResolver $moduleResolver;
-
     public function __construct(
         Loader $loader,
         string $locale,
         TranslationCacheRepository $cacheRepository,
-        PassiveCollector $passiveCollector,
-        ModuleResolver $moduleResolver
+        PassiveCollector $passiveCollector
     ) {
         parent::__construct($loader, $locale);
 
         $this->cacheRepository = $cacheRepository;
         $this->passiveCollector = $passiveCollector;
-        $this->moduleResolver = $moduleResolver;
     }
 
     /**
@@ -56,7 +51,7 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
             return null;
         }
 
-        return $this->getWithModule((string) $key, $replace, $this->normalizeLocale($locale), null, (bool) $fallback);
+        return $this->getFromSdk((string) $key, $replace, $this->normalizeLocale($locale), (bool) $fallback);
     }
 
     /**
@@ -73,7 +68,7 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
             return true;
         }
 
-        return $this->hasCachedTranslation($keyName, $this->normalizeLocale($locale), (bool) $fallback, null);
+        return $this->hasCachedTranslation($keyName, $this->normalizeLocale($locale), (bool) $fallback);
     }
 
     /**
@@ -89,32 +84,37 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
      */
     public function choice($key, $number, array $replace = [], $locale = null)
     {
-        return $this->choiceWithModule(
-            (string) $key,
-            $number,
-            $replace,
-            $this->normalizeLocale($locale),
-            null
+        $keyName = (string) $key;
+        $resolvedLocale = $this->localeForChoice($keyName, $locale);
+        $line = $this->getFromSdk($keyName, $replace, $resolvedLocale, true);
+
+        if (is_countable($number)) {
+            $number = count($number);
+        }
+
+        $replace['count'] = $number;
+
+        return $this->makeReplacements(
+            $this->getSelector()->choose((string) $line, $number, $resolvedLocale),
+            $replace
         );
     }
 
     /**
-     * `tc()` 对外暴露的简单入口。
+     * 对外暴露的翻译入口。
      */
     public function translate(
         string $key,
         array $replace = [],
-        ?string $locale = null,
-        ?string $module = null
+        ?string $locale = null
     ): string|array {
-        return $this->getWithModule($key, $replace, $locale, $module);
+        return $this->getFromSdk($key, $replace, $locale, true);
     }
 
-    public function getWithModule(
+    private function getFromSdk(
         string $key,
         array $replace = [],
         ?string $locale = null,
-        ?string $module = null,
         bool $fallback = true
     ): string|array {
         $keyName = trim($key);
@@ -129,16 +129,15 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
         }
 
         // 第二层: 远程翻译系统同步到本地的缓存。
-        $resolvedModule = $this->moduleResolver->resolve($module);
         foreach ($this->resolveCandidateLocales($locale, $fallback) as $candidateLocale) {
-            $cachedText = $this->cacheRepository->get($candidateLocale, $resolvedModule, $keyName);
+            $cachedText = $this->cacheRepository->get($candidateLocale, $keyName);
             if (is_string($cachedText)) {
                 return $this->makeReplacements($cachedText, $replace);
             }
         }
 
         // 第三层: 记录 miss，但最终仍然按 Laravel 风格返回原始 key。
-        $this->captureMissing($keyName, $resolvedModule);
+        $this->captureMissing($keyName);
 
         $missingKey = $this->handleMissingTranslationKey(
             $keyName,
@@ -148,34 +147,6 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
         );
 
         return $this->makeReplacements($missingKey, $replace);
-    }
-
-    /**
-     * 复数翻译也走同样的“本地 -> 远程缓存 -> 被动收集”链路。
-     *
-     * @param  array<string, scalar|null>  $replace
-     * @param  Countable|int|float|array<int, mixed>  $number
-     */
-    public function choiceWithModule(
-        string $key,
-        Countable|int|float|array $number,
-        array $replace = [],
-        ?string $locale = null,
-        ?string $module = null
-    ): string {
-        $resolvedLocale = $this->localeForChoice($key, $locale);
-        $line = $this->getWithModule($key, $replace, $resolvedLocale, $module);
-
-        if (is_countable($number)) {
-            $number = count($number);
-        }
-
-        $replace['count'] = $number;
-
-        return $this->makeReplacements(
-            $this->getSelector()->choose((string) $line, $number, $resolvedLocale),
-            $replace
-        );
     }
 
     /**
@@ -225,13 +196,10 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
     private function hasCachedTranslation(
         string $key,
         ?string $locale = null,
-        bool $fallback = true,
-        ?string $module = null
+        bool $fallback = true
     ): bool {
-        $resolvedModule = $this->moduleResolver->resolve($module);
-
         foreach ($this->resolveCandidateLocales($locale, $fallback) as $candidateLocale) {
-            if ($this->cacheRepository->has($candidateLocale, $resolvedModule, $key)) {
+            if ($this->cacheRepository->has($candidateLocale, $key)) {
                 return true;
             }
         }
@@ -287,14 +255,14 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
     /**
      * 运行时 miss 不能影响业务，所以这里只能“尽力而为”。
      */
-    private function captureMissing(string $key, string $module): void
+    private function captureMissing(string $key): void
     {
         if (! (bool) config('translation_sdk.collect.passive.enabled', true)) {
             return;
         }
 
         try {
-            $this->passiveCollector->captureMissing($key, $module);
+            $this->passiveCollector->captureMissing($key);
         } catch (Throwable) {
             // no-op, never break business response path
         }

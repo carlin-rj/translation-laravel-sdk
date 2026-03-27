@@ -10,7 +10,7 @@ use Illuminate\Contracts\Cache\Repository as CacheRepository;
 /**
  * 记录远程翻译包同步游标。
  *
- * 游标按 `locale + module` 独立保存，这样各个目标语言和模块可以分别增量同步。
+ * 游标按 `locale` 独立保存。
  */
 class PackageSyncCursorRepository
 {
@@ -27,9 +27,9 @@ class PackageSyncCursorRepository
         $this->keyPrefix = self::CURSOR_KEY_PREFIX;
     }
 
-    public function getCursor(string $locale, ?string $module): int
+    public function getCursor(string $locale): int
     {
-        $cursor = $this->cache->get($this->buildKey($locale, $module), 0);
+        $cursor = $this->cache->get($this->buildKey($locale), 0);
 
         return max(0, (int) $cursor);
     }
@@ -37,16 +37,13 @@ class PackageSyncCursorRepository
     /**
      * 同步游标属于长期状态，所以直接永久保存。
      */
-    public function saveCursor(string $locale, ?string $module, int $cursor): void
+    public function saveCursor(string $locale, int $cursor): void
     {
-        $this->cache->forever($this->buildKey($locale, $module), max(0, $cursor));
+        $this->cache->forever($this->buildKey($locale), max(0, $cursor));
     }
 
-    private function buildKey(string $locale, ?string $module): string
+    private function buildKey(string $locale): string
     {
-        $moduleText = trim((string) ($module ?? ''));
-        $moduleKey = $moduleText === '' ? '__all__' : $moduleText;
-
-        return sprintf('%s:%s:%s', $this->keyPrefix, $locale, $moduleKey);
+        return sprintf('%s:%s', $this->keyPrefix, $locale);
     }
 }

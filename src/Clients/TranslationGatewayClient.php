@@ -52,7 +52,6 @@ class TranslationGatewayClient implements TranslationGatewayClientInterface
         $this->post('/interact/translation/collect', [
             'items' => array_map(static function ($item): array {
                 return [
-                    'module' => (string) $item->module,
                     'key_name' => (string) $item->key_name,
                     'source_text' => (string) $item->source_text,
                 ];
@@ -66,7 +65,6 @@ class TranslationGatewayClient implements TranslationGatewayClientInterface
     public function fetchPackageIncremental(FetchPackageIncrementalRequestDto $request): FetchPackageIncrementalResultDto
     {
         $data = $this->post('/interact/translation/package/incremental', [
-            'module' => $request->module,
             'locale' => $request->locale,
             'cursor' => $request->cursor,
             'limit' => $request->limit,

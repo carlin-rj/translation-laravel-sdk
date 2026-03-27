@@ -25,14 +25,15 @@ class ActiveCollectorTest extends TestCase
             ->getMock();
         $scanner->expects($this->once())
             ->method('scan')
+            ->with(['/app'], ['php'], ['vendor'])
             ->willReturn(CollectBatchDto::from([
                 'scanned_files' => 3,
                 'items' => [
-                    ['module' => 'order', 'key_name' => 'k1', 'source_text' => 'k1'],
-                    ['module' => 'order', 'key_name' => 'k2', 'source_text' => 'k2'],
-                    ['module' => 'order', 'key_name' => 'k3', 'source_text' => 'k3'],
-                    ['module' => 'order', 'key_name' => 'k4', 'source_text' => 'k4'],
-                    ['module' => 'order', 'key_name' => 'k5', 'source_text' => 'k5'],
+                    ['key_name' => 'k1', 'source_text' => 'k1'],
+                    ['key_name' => 'k2', 'source_text' => 'k2'],
+                    ['key_name' => 'k3', 'source_text' => 'k3'],
+                    ['key_name' => 'k4', 'source_text' => 'k4'],
+                    ['key_name' => 'k5', 'source_text' => 'k5'],
                 ],
             ]));
 
@@ -45,7 +46,7 @@ class ActiveCollectorTest extends TestCase
             });
 
         $collector = new ActiveCollector($scanner, $gateway);
-        $result = $collector->collect(['/app'], 'order', 2);
+        $result = $collector->collect(['/app'], 2);
 
         $this->assertSame([2, 2, 1], $sizes);
         $this->assertSame(3, $result->scanned_files);
@@ -56,16 +57,14 @@ class ActiveCollectorTest extends TestCase
 
     public function test_collect_skips_push_when_no_items(): void
     {
-        $scanner = $this->getMockBuilder(FileKeyScanner::class)
-            ->onlyMethods(['scan'])
-            ->getMock();
+        $scanner = $this->createStub(FileKeyScanner::class);
         $scanner->method('scan')->willReturn(CollectBatchDto::from(['items' => []]));
 
         $gateway = $this->createMock(TranslationGatewayClientInterface::class);
         $gateway->expects($this->never())->method('collect');
 
         $collector = new ActiveCollector($scanner, $gateway);
-        $result = $collector->collect(['/app'], 'order', 2);
+        $result = $collector->collect(['/app'], 2);
 
         $this->assertSame(0, $result->scanned_files);
         $this->assertSame(0, $result->discovered_items);
@@ -101,7 +100,7 @@ class ActiveCollectorTest extends TestCase
             new FileKeyScanner($this->makeSourceTextResolver()),
             $gateway
         );
-        $result = $collector->collect([$baseDir], 'order', 10);
+        $result = $collector->collect([$baseDir], 10);
 
         $this->assertSame(2, $result->scanned_files);
         $this->assertSame(2, $result->discovered_items);
@@ -113,7 +112,6 @@ class ActiveCollectorTest extends TestCase
         $map = [];
         foreach ($batch->items as $item) {
             $map[$item->key_name] = $item->source_text;
-            $this->assertSame('order', $item->module);
         }
         $this->assertSame('待支付', $map['order.status.pending'] ?? null);
         $this->assertSame('Direct translation text', $map['Direct translation text'] ?? null);
@@ -160,7 +158,7 @@ class ActiveCollectorTest extends TestCase
             new FileKeyScanner($this->makeSourceTextResolver()),
             $gateway
         );
-        $result = $collector->collect([$baseDir], 'order', 2);
+        $result = $collector->collect([$baseDir], 2);
 
         $this->assertSame(3, $result->scanned_files);
         $this->assertSame(4, $result->discovered_items);
@@ -175,7 +173,6 @@ class ActiveCollectorTest extends TestCase
         foreach ($gateway->collected as $batch) {
             foreach ($batch->items as $item) {
                 $map[$item->key_name] = $item->source_text;
-                $this->assertSame('order', $item->module);
             }
         }
         $this->assertSame('待支付', $map['order.status.pending'] ?? null);

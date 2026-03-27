@@ -4,18 +4,14 @@
     "type": "library",
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "guzzlehttp/guzzle": "^7.0",
-        "illuminate/cache": "^8.83|^9.0|^10.0|^11.0|^12.0",
-        "illuminate/console": "^8.83|^9.0|^10.0|^11.0|^12.0",
-        "illuminate/http": "^8.83|^9.0|^10.0|^11.0|^12.0",
-        "illuminate/redis": "^8.83|^9.0|^10.0|^11.0|^12.0",
-        "illuminate/support": "^8.83|^9.0|^10.0|^11.0|^12.0",
-        "illuminate/translation": "^8.83|^9.0|^10.0|^11.0|^12.0"
-    },
-    "require-dev": {
-        "orchestra/testbench": "^6.23|^7.0|^8.0|^9.0|^10.0",
-        "phpunit/phpunit": "^9.6|^10.5"
+        "illuminate/cache": "^12.0",
+        "illuminate/console": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/redis": "^12.0",
+        "illuminate/support": "^12.0",
+        "illuminate/translation": "^12.0"
     },
     "autoload": {
         "psr-4": {
@@ -41,5 +37,9 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "require-dev": {
+        "orchestra/testbench": "*",
+      "phpunit/phpunit": "*"
+    }
 }

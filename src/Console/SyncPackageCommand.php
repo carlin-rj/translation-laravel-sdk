@@ -15,7 +15,6 @@ class SyncPackageCommand extends Command
 {
     protected $signature = 'translation-sdk:sync-package
         {--locale=* : 目标语种(可多次传入，默认读取系统配置)}
-        {--module= : 模块名(可选，不传则同步全部模块)}
         {--cursor= : 起始游标(覆盖增量游标，调试用)}
         {--limit= : 每页拉取条数}
         {--full : 强制全量同步(忽略已保存游标)}';
@@ -32,7 +31,6 @@ class SyncPackageCommand extends Command
             $targets = $syncService->fetchSyncTargets();
             $locales = $this->normalizeOptionValues($targets->target_locales);
         }
-        $module = $this->resolveModule($this->option('module'));
 
         if ($locales === []) {
             $this->warn('当前系统未配置可同步目标语种，已跳过');
@@ -53,26 +51,23 @@ class SyncPackageCommand extends Command
             $startCursor = $this->resolveStartCursor(
                 $cursorRepository,
                 $locale,
-                $module,
                 $manualCursor,
                 $forceFull
             );
 
-            $result = $syncService->sync($locale, $module, $startCursor, $limit);
+            $result = $syncService->sync($locale, $startCursor, $limit);
             $targetCount++;
             $totalPages += $result->pages;
             $totalItems += $result->synced_items;
 
             // 手动 cursor 为一次性调试模式，不写回持久游标。
             if ($manualCursor === null) {
-                $cursorRepository->saveCursor($locale, $module, $result->next_cursor);
+                $cursorRepository->saveCursor($locale, $result->next_cursor);
             }
 
-            $moduleLabel = $result->module === '*' ? 'ALL' : $result->module;
             $this->line(sprintf(
-                'locale=%s, module=%s, start_cursor=%d, next_cursor=%d, pages=%d, synced_items=%d',
+                'locale=%s, start_cursor=%d, next_cursor=%d, pages=%d, synced_items=%d',
                 $result->locale,
-                $moduleLabel,
                 $result->start_cursor,
                 $result->next_cursor,
                 $result->pages,
@@ -134,20 +129,6 @@ class SyncPackageCommand extends Command
     }
 
     /**
-     * 空字符串 module 统一转成 null，表示“同步全部模块”。
-     */
-    private function resolveModule(mixed $rawModule): ?string
-    {
-        if (is_array($rawModule)) {
-            $rawModule = $rawModule[0] ?? null;
-        }
-
-        $module = trim((string) ($rawModule ?? ''));
-
-        return $module === '' ? null : $module;
-    }
-
-    /**
      * 起始游标优先级:
      * - 手动 cursor
      * - full 模式
@@ -156,7 +137,6 @@ class SyncPackageCommand extends Command
     private function resolveStartCursor(
         PackageSyncCursorRepository $cursorRepository,
         string $locale,
-        ?string $module,
         ?int $manualCursor,
         bool $forceFull
     ): int {
@@ -167,6 +147,6 @@ class SyncPackageCommand extends Command
             return 0;
         }
 
-        return $cursorRepository->getCursor($locale, $module);
+        return $cursorRepository->getCursor($locale);
     }
 }

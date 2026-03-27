@@ -96,7 +96,6 @@ LUA;
         $bucket = $this->resolveBucket($fingerprint);
         [$hashKey, $queueKey] = $this->buildBucketKeys($bucket);
         $payload = json_encode([
-            'module' => $item->module,
             'key_name' => $item->key_name,
             'source_text' => $item->source_text,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -163,7 +162,6 @@ LUA;
                 }
 
                 $items[] = [
-                    'module' => (string) ($decoded['module'] ?? ''),
                     'key_name' => (string) ($decoded['key_name'] ?? ''),
                     'source_text' => (string) ($decoded['source_text'] ?? ''),
                 ];
@@ -197,7 +195,7 @@ LUA;
      */
     private function fingerprint(CollectItemDto $item): string
     {
-        return sha1($item->module . '|' . $item->key_name . '|' . $item->source_text);
+        return sha1($item->key_name . '|' . $item->source_text);
     }
 
     /**

@@ -31,11 +31,11 @@ class ActiveCollector
     /**
      * @param  array<int, string>  $paths
      */
-    public function collect(array $paths, string $defaultModule, int $batchSize): ActiveCollectResultDto
+    public function collect(array $paths, int $batchSize): ActiveCollectResultDto
     {
         $extensions = (array) config('translation_sdk.collect.scan_extensions', ['php']);
         $excludePaths = (array) config('translation_sdk.collect.exclude_paths', []);
-        $scanResult = $this->scanner->scan($paths, $defaultModule, $extensions, $excludePaths);
+        $scanResult = $this->scanner->scan($paths, $extensions, $excludePaths);
         $safeBatchSize = max(1, $batchSize);
 
         $pushedBatches = 0;

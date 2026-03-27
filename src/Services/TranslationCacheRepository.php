@@ -10,7 +10,7 @@ use Illuminate\Contracts\Cache\Repository as CacheRepository;
 /**
  * 远程翻译包在本地的缓存仓库。
  *
- * 缓存按 `locale + module` 分桶，运行时只需要查当前桶即可。
+ * 缓存按 `locale` 分桶，运行时只需要查当前语言桶即可。
  */
 class TranslationCacheRepository
 {
@@ -35,13 +35,13 @@ class TranslationCacheRepository
      *
      * @param  array<string, string>  $translations
      */
-    public function mergeTranslations(string $locale, string $module, array $translations): void
+    public function mergeTranslations(string $locale, array $translations): void
     {
         if ($translations === []) {
             return;
         }
 
-        $cacheKey = $this->buildCacheKey($locale, $module);
+        $cacheKey = $this->buildCacheKey($locale);
         $current = $this->readBucket($cacheKey);
         $merged = array_merge($current, $translations);
         $this->cache->put($cacheKey, $merged, $this->ttl);
@@ -50,9 +50,9 @@ class TranslationCacheRepository
     /**
      * 读取单个翻译值。
      */
-    public function get(string $locale, string $module, string $keyName): ?string
+    public function get(string $locale, string $keyName): ?string
     {
-        $payload = $this->readBucket($this->buildCacheKey($locale, $module));
+        $payload = $this->readBucket($this->buildCacheKey($locale));
         $value = $payload[$keyName] ?? null;
 
         return is_string($value) ? $value : null;
@@ -61,9 +61,9 @@ class TranslationCacheRepository
     /**
      * 只判断远程缓存里是否存在这个 key。
      */
-    public function has(string $locale, string $module, string $keyName): bool
+    public function has(string $locale, string $keyName): bool
     {
-        $payload = $this->readBucket($this->buildCacheKey($locale, $module));
+        $payload = $this->readBucket($this->buildCacheKey($locale));
 
         return array_key_exists($keyName, $payload) && is_string($payload[$keyName]);
     }
@@ -80,8 +80,8 @@ class TranslationCacheRepository
         return is_array($payload) ? $payload : [];
     }
 
-    private function buildCacheKey(string $locale, string $module): string
+    private function buildCacheKey(string $locale): string
     {
-        return sprintf('%s:%s:%s', $this->keyPrefix, $locale, $module);
+        return sprintf('%s:%s', $this->keyPrefix, $locale);
     }
 }

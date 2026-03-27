@@ -47,12 +47,11 @@ class FileKeyScannerTest extends TestCase
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'order', ['php', 'blade.php']);
+        $result = $scanner->scan([$baseDir], ['php', 'blade.php']);
 
         $map = [];
         foreach ($result->items as $item) {
             $map[$item->key_name] = $item->source_text;
-            $this->assertSame('order', $item->module);
         }
 
         $this->assertSame(3, $result->scanned_files);
@@ -93,7 +92,7 @@ class FileKeyScannerTest extends TestCase
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'order', ['php']);
+        $result = $scanner->scan([$baseDir], ['php']);
 
         $map = [];
         foreach ($result->items as $item) {
@@ -134,22 +133,17 @@ class FileKeyScannerTest extends TestCase
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'order', ['php']);
+        $result = $scanner->scan([$baseDir], ['php']);
 
         $map = [];
         foreach ($result->items as $item) {
-            $map[$item->key_name] = [
-                'module' => $item->module,
-                'source' => $item->source_text,
-            ];
+            $map[$item->key_name] = $item->source_text;
         }
 
         $this->assertSame(2, $result->scanned_files);
         $this->assertCount(2, $result->items);
-        $this->assertSame('order', $map['order.status.pending']['module'] ?? null);
-        $this->assertSame('待支付', $map['order.status.pending']['source'] ?? null);
-        $this->assertSame('order', $map['Direct translation text']['module'] ?? null);
-        $this->assertSame('Direct translation text', $map['Direct translation text']['source'] ?? null);
+        $this->assertSame('待支付', $map['order.status.pending'] ?? null);
+        $this->assertSame('Direct translation text', $map['Direct translation text'] ?? null);
 
         $this->removeTempDirectory($baseDir);
     }
@@ -175,12 +169,11 @@ class FileKeyScannerTest extends TestCase
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'order', ['php', 'blade.php']);
+        $result = $scanner->scan([$baseDir], ['php', 'blade.php']);
 
         $map = [];
         foreach ($result->items as $item) {
             $map[$item->key_name] = $item->source_text;
-            $this->assertSame('order', $item->module);
         }
 
         $this->assertSame(2, $result->scanned_files);
@@ -200,7 +193,7 @@ class FileKeyScannerTest extends TestCase
         file_put_contents($baseDir . '/ok.php', "<?php __('ok.key');");
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'order', ['php'], ['/ignore/']);
+        $result = $scanner->scan([$baseDir], ['php'], ['/ignore/']);
 
         $this->assertSame(1, $result->scanned_files);
         $this->assertCount(1, $result->items);
@@ -209,40 +202,37 @@ class FileKeyScannerTest extends TestCase
         $this->removeTempDirectory($baseDir);
     }
 
-    public function test_scan_parses_tc_module_and_common_variants(): void
+    public function test_scan_covers_user_requested_examples_in_multiple_files(): void
     {
-        $baseDir = $this->createTempDirectory('scan-tc');
+        $baseDir = $this->createTempDirectory('scan-user-examples');
         file_put_contents(
-            $baseDir . '/tc.php',
+            $baseDir . '/first.php',
             <<<'PHP'
             <?php
-            tc('order.pending');
-            tc('order.paid', ['name' => 'Tom']);
-            tc('order.created', [], null, 'order');
-            tc('order.confirmed', ['name' => 'Tom'], module: 'pay');
+            __('order.status.pending');
+            PHP
+        );
+        file_put_contents(
+            $baseDir . '/second.php',
+            <<<'PHP'
+            <?php
+            trans('order.status.pending');
+            __("Direct translation text");
             PHP
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'default-module', ['php']);
+        $result = $scanner->scan([$baseDir], ['php']);
 
         $map = [];
         foreach ($result->items as $item) {
-            $map[$item->key_name] = [
-                'module' => $item->module,
-                'source' => $item->source_text,
-            ];
+            $map[$item->key_name] = $item->source_text;
         }
 
-        $this->assertSame(1, $result->scanned_files);
-        $this->assertSame('default-module', $map['order.pending']['module'] ?? null);
-        $this->assertSame('待处理', $map['order.pending']['source'] ?? null);
-        $this->assertSame('default-module', $map['order.paid']['module'] ?? null);
-        $this->assertSame('已支付', $map['order.paid']['source'] ?? null);
-        $this->assertSame('order', $map['order.created']['module'] ?? null);
-        $this->assertSame('已创建', $map['order.created']['source'] ?? null);
-        $this->assertSame('pay', $map['order.confirmed']['module'] ?? null);
-        $this->assertSame('已确认', $map['order.confirmed']['source'] ?? null);
+        $this->assertSame(2, $result->scanned_files);
+        $this->assertCount(2, $result->items);
+        $this->assertSame('待支付', $map['order.status.pending'] ?? null);
+        $this->assertSame('Direct translation text', $map['Direct translation text'] ?? null);
 
         $this->removeTempDirectory($baseDir);
     }
@@ -261,10 +251,6 @@ class FileKeyScannerTest extends TestCase
             lang('order.finished');
             Lang::choice('cart.total_count', $count);
             Lang::has('feature.enabled');
-            tc(key: 'payment.success', module: 'payment');
-            tc(key: '支付成功1', module: 'payment1');
-            tc(key: '支付成功2', [], null, 'payment1');
-            tc(key: '支付成功3');
             PHP
         );
         file_put_contents(
@@ -275,38 +261,22 @@ class FileKeyScannerTest extends TestCase
         );
 
         $scanner = new FileKeyScanner($this->makeSourceTextResolver());
-        $result = $scanner->scan([$baseDir], 'default-module', ['php', 'blade.php']);
+        $result = $scanner->scan([$baseDir], ['php', 'blade.php']);
 
         $map = [];
         foreach ($result->items as $item) {
-            $map[$item->key_name] = [
-                'module' => $item->module,
-                'source' => $item->source_text,
-            ];
+            $map[$item->key_name] = $item->source_text;
         }
 
         $this->assertSame(2, $result->scanned_files);
-        $this->assertSame('default-module', $map['订单创建 :orderSn']['module'] ?? null);
-        $this->assertSame('订单创建 :orderSn', $map['订单创建 :orderSn']['source'] ?? null);
-        $this->assertSame('default-module', $map['订单支付成功 :orderSn']['module'] ?? null);
-        $this->assertSame('订单支付成功 :orderSn', $map['订单支付成功 :orderSn']['source'] ?? null);
-        $this->assertSame('default-module', $map['order.item_count']['module'] ?? null);
-        $this->assertSame('订单数量', $map['order.item_count']['source'] ?? null);
-        $this->assertSame('default-module', $map['order.shipped']['module'] ?? null);
-        $this->assertSame('已发货', $map['order.shipped']['source'] ?? null);
-        $this->assertSame('default-module', $map['order.finished']['module'] ?? null);
-        $this->assertSame('已完成', $map['order.finished']['source'] ?? null);
-        $this->assertSame('default-module', $map['cart.total_count']['module'] ?? null);
-        $this->assertSame('购物车数量', $map['cart.total_count']['source'] ?? null);
-        $this->assertSame('default-module', $map['feature.enabled']['module'] ?? null);
-        $this->assertSame('功能已启用', $map['feature.enabled']['source'] ?? null);
-        $this->assertSame('payment', $map['payment.success']['module'] ?? null);
-        $this->assertSame('支付成功', $map['payment.success']['source'] ?? null);
-        $this->assertSame('default-module', $map['blade.greeting :name']['module'] ?? null);
-        $this->assertSame('blade.greeting :name', $map['blade.greeting :name']['source'] ?? null);
-        $this->assertSame('支付成功1', $map['支付成功1']['source'] ?? null);
-        $this->assertSame('支付成功2', $map['支付成功2']['source'] ?? null);
-        $this->assertSame('支付成功3', $map['支付成功3']['source'] ?? null);
+        $this->assertSame('订单创建 :orderSn', $map['订单创建 :orderSn'] ?? null);
+        $this->assertSame('订单支付成功 :orderSn', $map['订单支付成功 :orderSn'] ?? null);
+        $this->assertSame('订单数量', $map['order.item_count'] ?? null);
+        $this->assertSame('已发货', $map['order.shipped'] ?? null);
+        $this->assertSame('已完成', $map['order.finished'] ?? null);
+        $this->assertSame('购物车数量', $map['cart.total_count'] ?? null);
+        $this->assertSame('功能已启用', $map['feature.enabled'] ?? null);
+        $this->assertSame('blade.greeting :name', $map['blade.greeting :name'] ?? null);
 
         $this->removeTempDirectory($baseDir);
     }
@@ -346,10 +316,6 @@ class FileKeyScannerTest extends TestCase
             'status' => [
                 'pending' => '待支付',
             ],
-            'pending' => '待处理',
-            'paid' => '已支付',
-            'created' => '已创建',
-            'confirmed' => '已确认',
             'item_count' => '订单数量',
             'shipped' => '已发货',
             'finished' => '已完成',

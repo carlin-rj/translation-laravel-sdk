@@ -8,8 +8,6 @@ class PackageSyncResultDto extends BaseDto
 {
     public string $locale = '';
 
-    public string $module = '';
-
     public int $start_cursor = 0;
 
     public int $next_cursor = 0;

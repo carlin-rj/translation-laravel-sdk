@@ -34,7 +34,6 @@ class StubGatewayClient implements TranslationGatewayClientInterface
             'system_code' => 'test',
             'source_locale' => 'zh-CN',
             'target_locales' => ['en-US'],
-            'modules' => ['default'],
         ]);
     }
 

@@ -90,10 +90,7 @@ class RedisMissingBufferTest extends TestCase
             }
         };
 
-        $redis = $this->getMockBuilder(RedisManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['connection'])
-            ->getMock();
+        $redis = $this->createStub(RedisManager::class);
         $redis->method('connection')->willReturn($conn);
 
         config()->set('translation_sdk.collect.passive.redis_connection', 'default');
@@ -102,7 +99,6 @@ class RedisMissingBufferTest extends TestCase
 
         $buffer = new RedisMissingBuffer($redis);
         $item = CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'order.status.pending',
             'source_text' => 'pending',
         ]);
@@ -166,10 +162,7 @@ class RedisMissingBufferTest extends TestCase
             }
         };
 
-        $redis = $this->getMockBuilder(RedisManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['connection'])
-            ->getMock();
+        $redis = $this->createStub(RedisManager::class);
         $redis->method('connection')->willReturn($conn);
 
         config()->set('translation_sdk.collect.passive.redis_connection', 'default');
@@ -178,12 +171,10 @@ class RedisMissingBufferTest extends TestCase
 
         $buffer = new RedisMissingBuffer($redis);
         $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'k1',
             'source_text' => 's1',
         ]));
         $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'k2',
             'source_text' => 's2',
         ]));
@@ -200,8 +191,7 @@ class RedisMissingBufferTest extends TestCase
         $buffer->expects($this->once())
             ->method('push')
             ->with($this->callback(static function (CollectItemDto $item): bool {
-                return $item->module === 'order'
-                    && $item->key_name === 'order.status.pending'
+                return $item->key_name === 'order.status.pending'
                     && $item->source_text === 'pending';
             }))
             ->willReturn(1);
@@ -209,7 +199,6 @@ class RedisMissingBufferTest extends TestCase
         $batch = CollectBatchDto::from([
             'items' => [
                 [
-                    'module' => 'order',
                     'key_name' => 'order.status.pending',
                     'source_text' => 'pending',
                 ],
@@ -240,10 +229,7 @@ class RedisMissingBufferTest extends TestCase
             }
         };
 
-        $redis = $this->getMockBuilder(RedisManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['connection'])
-            ->getMock();
+        $redis = $this->createStub(RedisManager::class);
         $redis->method('connection')->willReturn($conn);
 
         config()->set('translation_sdk.collect.passive.redis_connection', 'default');
@@ -252,7 +238,6 @@ class RedisMissingBufferTest extends TestCase
 
         $buffer = new RedisMissingBuffer($redis);
         $size = $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'order.status.pending',
             'source_text' => "\xB1\x31",
         ]));
@@ -285,7 +270,6 @@ class RedisMissingBufferTest extends TestCase
                     'not-json',
                     json_encode('scalar-json'),
                     json_encode([
-                        'module' => 'order',
                         'key_name' => 'order.status.pending',
                         'source_text' => 'pending',
                     ]),
@@ -298,10 +282,7 @@ class RedisMissingBufferTest extends TestCase
             }
         };
 
-        $redis = $this->getMockBuilder(RedisManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['connection'])
-            ->getMock();
+        $redis = $this->createStub(RedisManager::class);
         $redis->method('connection')->willReturn($conn);
 
         config()->set('translation_sdk.collect.passive.redis_connection', 'default');
@@ -339,10 +320,7 @@ class RedisMissingBufferTest extends TestCase
             }
         };
 
-        $redis = $this->getMockBuilder(RedisManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['connection'])
-            ->getMock();
+        $redis = $this->createStub(RedisManager::class);
         $redis->method('connection')->willReturn($conn);
 
         config()->set('translation_sdk.collect.passive.redis_connection', 'default');

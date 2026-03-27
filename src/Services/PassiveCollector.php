@@ -22,8 +22,6 @@ class PassiveCollector
 
     private MissingBufferInterface $buffer;
 
-    private ModuleResolver $moduleResolver;
-
     private SourceTextResolver $sourceTextResolver;
 
     private CacheRepository $reportCache;
@@ -32,13 +30,11 @@ class PassiveCollector
 
     public function __construct(
         MissingBufferInterface $buffer,
-        ModuleResolver $moduleResolver,
         SourceTextResolver $sourceTextResolver,
         CacheFactory $cacheFactory
     )
     {
         $this->buffer = $buffer;
-        $this->moduleResolver = $moduleResolver;
         $this->sourceTextResolver = $sourceTextResolver;
         $this->reportCache = $cacheFactory->store();
         $this->reportCooldownSeconds = max(0, (int) config('translation_sdk.collect.passive.report_cooldown_seconds', 600));
@@ -50,25 +46,23 @@ class PassiveCollector
      * source_text 统一交给 SourceTextResolver 处理，
      * 保证运行时被动收集和全局扫描使用同一套规则。
      */
-    public function captureMissing(string $key, ?string $module = null): int
+    public function captureMissing(string $key): int
     {
         $keyName = trim($key);
         if ($keyName === '') {
             return $this->buffer->size();
         }
 
-        $resolvedModule = $this->moduleResolver->resolve($module);
         // 冷却窗口内同一条缺失翻译只上报一次，避免未翻译期间高频重复上报。
-        if ($this->shouldSkipByCooldown($resolvedModule, $keyName)) {
+        if ($this->shouldSkipByCooldown($keyName)) {
             return $this->buffer->size();
         }
 
         $size = $this->buffer->push(CollectItemDto::from([
-            'module' => $resolvedModule,
             'key_name' => $keyName,
             'source_text' => $this->sourceTextResolver->resolve($keyName),
         ]));
-        $this->markReported($resolvedModule, $keyName);
+        $this->markReported($keyName);
 
         return $size;
     }
@@ -84,21 +78,21 @@ class PassiveCollector
     }
 
     /**
-     * cooldown 键只按 `module + key` 去重，不再混入隐式推断值。
+     * cooldown 键只按 `key` 去重。
      */
-    private function shouldSkipByCooldown(string $module, string $keyName): bool
+    private function shouldSkipByCooldown(string $keyName): bool
     {
         if ($this->reportCooldownSeconds <= 0) {
             return false;
         }
 
-        return (bool) $this->reportCache->get($this->buildReportCacheKey($module, $keyName), false);
+        return (bool) $this->reportCache->get($this->buildReportCacheKey($keyName), false);
     }
 
     /**
      * 标记“这个缺失项刚刚已经上报过”。
      */
-    private function markReported(string $module, string $keyName): void
+    private function markReported(string $keyName): void
     {
         if ($this->reportCooldownSeconds <= 0) {
             return;
@@ -106,7 +100,7 @@ class PassiveCollector
 
         // 记录最近一次上报时间，作为下一次采集的冷却判断依据。
         $this->reportCache->put(
-            $this->buildReportCacheKey($module, $keyName),
+            $this->buildReportCacheKey($keyName),
             true,
             $this->reportCooldownSeconds
         );
@@ -115,8 +109,8 @@ class PassiveCollector
     /**
      * 用短 hash 缩短 cache key，避免 key 太长不易管理。
      */
-    private function buildReportCacheKey(string $module, string $keyName): string
+    private function buildReportCacheKey(string $keyName): string
     {
-        return sprintf('%s:%s', self::REPORT_CACHE_KEY_PREFIX, sha1($module . '|' . $keyName));
+        return sprintf('%s:%s', self::REPORT_CACHE_KEY_PREFIX, sha1($keyName));
     }
 }

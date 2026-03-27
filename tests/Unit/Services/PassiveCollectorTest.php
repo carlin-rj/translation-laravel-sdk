@@ -6,7 +6,6 @@ namespace TranslationSdk\Tests\Unit\Services;
 
 use TranslationSdk\Contracts\MissingBufferInterface;
 use TranslationSdk\Dto\CollectItemDto;
-use TranslationSdk\Services\ModuleResolver;
 use TranslationSdk\Services\PassiveCollector;
 use TranslationSdk\Services\SourceTextResolver;
 use TranslationSdk\Tests\Fakes\InMemoryMissingBuffer;
@@ -22,14 +21,13 @@ class PassiveCollectorTest extends TestCase
             ->method('resolve')
             ->with('order.status.pending')
             ->willReturn('待支付');
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
 
-        $size = $collector->captureMissing('order.status.pending', 'order');
+        $size = $collector->captureMissing('order.status.pending');
 
         $this->assertSame(1, $size);
         $items = $buffer->all();
         $this->assertCount(1, $items);
-        $this->assertSame('order', $items[0]->module);
         $this->assertSame('order.status.pending', $items[0]->key_name);
         $this->assertSame('待支付', $items[0]->source_text);
     }
@@ -38,10 +36,13 @@ class PassiveCollectorTest extends TestCase
     {
         $buffer = new InMemoryMissingBuffer();
         $sourceTextResolver = $this->createMock(SourceTextResolver::class);
-        $sourceTextResolver->method('resolve')->willReturn('order.created');
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
+        $sourceTextResolver->expects($this->once())
+            ->method('resolve')
+            ->with('order.created')
+            ->willReturn('order.created');
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
 
-        $collector->captureMissing('order.created', 'order');
+        $collector->captureMissing('order.created');
 
         $items = $buffer->all();
         $this->assertSame('order.created', $items[0]->source_text);
@@ -52,9 +53,9 @@ class PassiveCollectorTest extends TestCase
         $buffer = new InMemoryMissingBuffer();
         $sourceTextResolver = $this->createMock(SourceTextResolver::class);
         $sourceTextResolver->expects($this->never())->method('resolve');
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
 
-        $size = $collector->captureMissing('  ', 'order');
+        $size = $collector->captureMissing('  ');
 
         $this->assertSame(0, $size);
         $this->assertCount(0, $buffer->all());
@@ -65,13 +66,15 @@ class PassiveCollectorTest extends TestCase
         config()->set('translation_sdk.collect.passive.flush_threshold', 2);
         $buffer = new InMemoryMissingBuffer();
         $sourceTextResolver = $this->createMock(SourceTextResolver::class);
-        $sourceTextResolver->method('resolve')->willReturnCallback(static fn (string $key): string => $key);
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
+        $sourceTextResolver->expects($this->exactly(2))
+            ->method('resolve')
+            ->willReturnCallback(static fn (string $key): string => $key);
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
 
-        $collector->captureMissing('a', 'm');
+        $collector->captureMissing('a');
         $this->assertFalse($collector->shouldFlush());
 
-        $collector->captureMissing('b', 'm');
+        $collector->captureMissing('b');
         $this->assertTrue($collector->shouldFlush());
     }
 
@@ -87,16 +90,15 @@ class PassiveCollectorTest extends TestCase
         $buffer->expects($this->once())
             ->method('push')
             ->with($this->callback(static function (CollectItemDto $item): bool {
-                return $item->module === 'order'
-                    && $item->key_name === 'order.status.pending'
+                return $item->key_name === 'order.status.pending'
                     && $item->source_text === '待支付';
             }))
             ->willReturn(1);
         $buffer->method('size')->willReturn(1);
 
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
-        $collector->captureMissing('order.status.pending', 'order');
-        $collector->captureMissing('order.status.pending', 'order');
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
+        $collector->captureMissing('order.status.pending');
+        $collector->captureMissing('order.status.pending');
     }
 
     public function test_capture_missing_with_zero_cooldown_reports_every_time(): void
@@ -112,50 +114,33 @@ class PassiveCollectorTest extends TestCase
             ->method('push')
             ->willReturnOnConsecutiveCalls(1, 2);
 
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
-        $first = $collector->captureMissing('order.status.pending', 'order');
-        $second = $collector->captureMissing('order.status.pending', 'order');
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
+        $first = $collector->captureMissing('order.status.pending');
+        $second = $collector->captureMissing('order.status.pending');
 
         $this->assertSame(1, $first);
         $this->assertSame(2, $second);
     }
 
-    public function test_capture_missing_uses_default_module_when_module_is_null(): void
-    {
-        config()->set('translation_sdk.default_module', 'fallback-module');
-        $buffer = new InMemoryMissingBuffer();
-        $sourceTextResolver = $this->createMock(SourceTextResolver::class);
-        $sourceTextResolver->method('resolve')->willReturn('待支付');
-
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
-        $collector->captureMissing('order.status.pending', null);
-
-        $items = $buffer->all();
-        $this->assertSame('fallback-module', $items[0]->module);
-    }
-
-    public function test_capture_missing_cooldown_isolated_by_module(): void
+    public function test_capture_missing_cooldown_isolated_by_key(): void
     {
         config()->set('translation_sdk.collect.passive.report_cooldown_seconds', 600);
         $buffer = $this->createMock(MissingBufferInterface::class);
         $sourceTextResolver = $this->createMock(SourceTextResolver::class);
         $sourceTextResolver->expects($this->exactly(2))
             ->method('resolve')
-            ->with('order.status.pending')
-            ->willReturn('待支付');
+            ->willReturnCallback(static fn (string $key): string => $key);
         $buffer->expects($this->exactly(2))
             ->method('push')
             ->with($this->callback(static function (CollectItemDto $item): bool {
-                return in_array($item->module, ['order', 'payment'], true)
-                    && $item->key_name === 'order.status.pending'
-                    && $item->source_text === '待支付';
+                return in_array($item->key_name, ['order.status.pending', 'order.status.paid'], true);
             }))
             ->willReturn(1);
         $buffer->method('size')->willReturn(1);
 
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
-        $collector->captureMissing('order.status.pending', 'order');
-        $collector->captureMissing('order.status.pending', 'payment');
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
+        $collector->captureMissing('order.status.pending');
+        $collector->captureMissing('order.status.paid');
     }
 
     public function test_should_flush_uses_one_when_threshold_non_positive(): void
@@ -163,10 +148,13 @@ class PassiveCollectorTest extends TestCase
         config()->set('translation_sdk.collect.passive.flush_threshold', 0);
         $buffer = new InMemoryMissingBuffer();
         $sourceTextResolver = $this->createMock(SourceTextResolver::class);
-        $sourceTextResolver->method('resolve')->willReturnCallback(static fn (string $key): string => $key);
+        $sourceTextResolver->expects($this->once())
+            ->method('resolve')
+            ->with('order.status.pending')
+            ->willReturnCallback(static fn (string $key): string => $key);
 
-        $collector = new PassiveCollector($buffer, new ModuleResolver(), $sourceTextResolver, app('cache'));
-        $collector->captureMissing('order.status.pending', 'order');
+        $collector = new PassiveCollector($buffer, $sourceTextResolver, app('cache'));
+        $collector->captureMissing('order.status.pending');
 
         $this->assertTrue($collector->shouldFlush());
     }

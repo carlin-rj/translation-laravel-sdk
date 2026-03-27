@@ -37,7 +37,6 @@ abstract class TestCase extends OrchestraTestCase
 
         config()->set('translation_sdk.cache.store', 'array');
         config()->set('translation_sdk.cache.ttl', 600);
-        config()->set('translation_sdk.default_module', 'default');
         config()->set('translation_sdk.collect.passive.enabled', false);
         config()->set('translation_sdk.collect.passive.flush_threshold', 2);
         config()->set('translation_sdk.collect.passive.report_cooldown_seconds', 600);
