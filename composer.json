@@ -1,0 +1,45 @@
+{
+    "name": "carlin/translation-laravel-sdk",
+    "description": "Laravel SDK for translation collection and package sync",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "guzzlehttp/guzzle": "^7.0",
+        "illuminate/cache": "^8.83|^9.0|^10.0|^11.0|^12.0",
+        "illuminate/console": "^8.83|^9.0|^10.0|^11.0|^12.0",
+        "illuminate/http": "^8.83|^9.0|^10.0|^11.0|^12.0",
+        "illuminate/redis": "^8.83|^9.0|^10.0|^11.0|^12.0",
+        "illuminate/support": "^8.83|^9.0|^10.0|^11.0|^12.0",
+        "illuminate/translation": "^8.83|^9.0|^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^6.23|^7.0|^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^9.6|^10.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "TranslationSdk\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TranslationSdk\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit -c phpunit.xml"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TranslationSdk\\TranslationSdkServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
