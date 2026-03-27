@@ -19,12 +19,10 @@ class MissingFlushServiceTest extends TestCase
     {
         $buffer = new InMemoryMissingBuffer();
         $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'order.status.pending',
             'source_text' => 'pending',
         ]));
         $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'order.status.created',
             'source_text' => 'created',
         ]));
@@ -45,13 +43,14 @@ class MissingFlushServiceTest extends TestCase
     {
         $buffer = new InMemoryMissingBuffer();
         $buffer->push(CollectItemDto::from([
-            'module' => 'order',
             'key_name' => 'order.status.pending',
             'source_text' => 'pending',
         ]));
 
         $gateway = $this->createMock(TranslationGatewayClientInterface::class);
-        $gateway->method('collect')->willThrowException(new RuntimeException('network error'));
+        $gateway->expects($this->once())
+            ->method('collect')
+            ->willThrowException(new RuntimeException('network error'));
 
         $service = new MissingFlushService($buffer, $gateway);
         $result = $service->flush(10);
@@ -111,7 +110,6 @@ class MissingFlushServiceTest extends TestCase
         $batch = CollectBatchDto::from([
             'items' => [
                 CollectItemDto::from([
-                    'module' => 'order',
                     'key_name' => 'order.status.pending',
                     'source_text' => 'pending',
                 ]),

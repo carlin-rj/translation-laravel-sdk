@@ -6,7 +6,6 @@ namespace TranslationSdk\Tests\Unit\Services;
 
 use Illuminate\Translation\ArrayLoader;
 use RuntimeException;
-use TranslationSdk\Services\ModuleResolver;
 use TranslationSdk\Services\PassiveCollector;
 use TranslationSdk\Services\SdkTranslator;
 use TranslationSdk\Services\TranslationCacheRepository;
@@ -33,13 +32,8 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $collector->expects($this->never())->method('captureMissing');
 
-        $moduleResolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $moduleResolver->expects($this->never())->method('resolve');
-
-        $translator = new SdkTranslator($loader, 'en', $cache, $collector, $moduleResolver);
-        $text = $translator->translate('order.status.pending', ['name' => 'Tom'], 'en', 'order');
+        $translator = new SdkTranslator($loader, 'en', $cache, $collector);
+        $text = $translator->translate('order.status.pending', ['name' => 'Tom'], 'en');
 
         $this->assertSame('Local Tom', $text);
     }
@@ -53,7 +47,7 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $cache->expects($this->once())
             ->method('get')
-            ->with('en', 'order', 'order.status.pending')
+            ->with('en', 'order.status.pending')
             ->willReturn('Order :name is :status');
 
         $collector = $this->getMockBuilder(PassiveCollector::class)
@@ -62,20 +56,11 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $collector->expects($this->never())->method('captureMissing');
 
-        $moduleResolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $moduleResolver->expects($this->once())
-            ->method('resolve')
-            ->with('order')
-            ->willReturn('order');
-
-        $translator = new SdkTranslator($loader, 'en', $cache, $collector, $moduleResolver);
+        $translator = new SdkTranslator($loader, 'en', $cache, $collector);
         $text = $translator->translate(
             'order.status.pending',
             ['name' => 'Tom', 'status' => 'pending'],
-            'en',
-            'order'
+            'en'
         );
 
         $this->assertSame('Order Tom is pending', $text);
@@ -90,7 +75,10 @@ class SdkTranslatorTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['get'])
             ->getMock();
-        $cache->expects($this->once())->method('get')->willReturn(null);
+        $cache->expects($this->once())
+            ->method('get')
+            ->with('en', 'order.status.pending')
+            ->willReturn(null);
 
         $collector = $this->getMockBuilder(PassiveCollector::class)
             ->disableOriginalConstructor()
@@ -98,15 +86,10 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $collector->expects($this->once())
             ->method('captureMissing')
-            ->with('order.status.pending', 'order');
+            ->with('order.status.pending');
 
-        $moduleResolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $moduleResolver->method('resolve')->willReturn('order');
-
-        $translator = new SdkTranslator($loader, 'en', $cache, $collector, $moduleResolver);
-        $text = $translator->translate('order.status.pending', [], 'en', 'order');
+        $translator = new SdkTranslator($loader, 'en', $cache, $collector);
+        $text = $translator->translate('order.status.pending', [], 'en');
 
         $this->assertSame('order.status.pending', $text);
     }
@@ -117,30 +100,19 @@ class SdkTranslatorTest extends TestCase
         config()->set('app.locale', 'zh-CN');
 
         $loader = new ArrayLoader();
-        $cache = $this->getMockBuilder(TranslationCacheRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['get'])
-            ->getMock();
+        $cache = $this->createStub(TranslationCacheRepository::class);
         $cache->method('get')->willReturn(null);
 
-        $collector = $this->getMockBuilder(PassiveCollector::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['captureMissing'])
-            ->getMock();
+        $collector = $this->createStub(PassiveCollector::class);
         $collector->method('captureMissing')->willThrowException(new RuntimeException('flush error'));
 
-        $moduleResolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $moduleResolver->method('resolve')->willReturn('order');
-
-        $translator = new SdkTranslator($loader, 'zh-CN', $cache, $collector, $moduleResolver);
-        $text = $translator->translate('order.status.created', [], null, null);
+        $translator = new SdkTranslator($loader, 'zh-CN', $cache, $collector);
+        $text = $translator->translate('order.status.created', [], null);
 
         $this->assertSame('order.status.created', $text);
     }
 
-    public function test_choice_with_module_uses_cached_translation(): void
+    public function test_choice_uses_cached_translation(): void
     {
         $loader = new ArrayLoader();
         $cache = $this->getMockBuilder(TranslationCacheRepository::class)
@@ -149,7 +121,7 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $cache->expects($this->once())
             ->method('get')
-            ->with('en', 'order', 'order.items')
+            ->with('en', 'order.items')
             ->willReturn('{1} One item|[2,*] :count items');
 
         $collector = $this->getMockBuilder(PassiveCollector::class)
@@ -158,16 +130,8 @@ class SdkTranslatorTest extends TestCase
             ->getMock();
         $collector->expects($this->never())->method('captureMissing');
 
-        $moduleResolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $moduleResolver->expects($this->once())
-            ->method('resolve')
-            ->with('order')
-            ->willReturn('order');
-
-        $translator = new SdkTranslator($loader, 'en', $cache, $collector, $moduleResolver);
-        $text = $translator->choiceWithModule('order.items', 3, [], 'en', 'order');
+        $translator = new SdkTranslator($loader, 'en', $cache, $collector);
+        $text = $translator->choice('order.items', 3, [], 'en');
 
         $this->assertSame('3 items', $text);
     }

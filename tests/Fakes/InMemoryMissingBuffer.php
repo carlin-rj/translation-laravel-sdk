@@ -61,7 +61,6 @@ class InMemoryMissingBuffer implements MissingBufferInterface
 
     private function fingerprint(CollectItemDto $item): string
     {
-        return sha1($item->module . '|' . $item->key_name . '|' . $item->source_text);
+        return sha1($item->key_name . '|' . $item->source_text);
     }
 }
-

@@ -37,7 +37,6 @@ class TranslationGatewayClientTest extends TestCase
         $client->collect(CollectBatchDto::from([
             'items' => [
                 [
-                    'module' => 'order',
                     'key_name' => 'order.status.pending',
                     'source_text' => 'pending',
                 ],
@@ -49,8 +48,8 @@ class TranslationGatewayClientTest extends TestCase
 
             return $request->url() === 'http://gateway.test/interact/translation/collect'
                 && $request->hasHeader('X-System-Token', 'token-123')
-                && ($body['items'][0]['module'] ?? '') === 'order'
-                && ($body['items'][0]['key_name'] ?? '') === 'order.status.pending';
+                && ($body['items'][0]['key_name'] ?? '') === 'order.status.pending'
+                && ($body['items'][0]['source_text'] ?? '') === 'pending';
         });
     }
 
@@ -80,7 +79,6 @@ class TranslationGatewayClientTest extends TestCase
                             'id' => 1,
                             'translation_key_id' => 10,
                             'locale' => 'en',
-                            'module' => 'order',
                             'key_name' => 'order.status.pending',
                             'translation_text' => 'Pending',
                         ],
@@ -92,7 +90,6 @@ class TranslationGatewayClientTest extends TestCase
         $client = new TranslationGatewayClient($http);
         $result = $client->fetchPackageIncremental(FetchPackageIncrementalRequestDto::from([
             'locale' => 'en',
-            'module' => 'order',
             'cursor' => 0,
             'limit' => 200,
         ]));
@@ -113,7 +110,6 @@ class TranslationGatewayClientTest extends TestCase
                     'system_code' => 'purchase',
                     'source_locale' => 'zh-CN',
                     'target_locales' => ['en-US', 'ja-JP'],
-                    'modules' => ['order', 'payment'],
                 ],
             ], 200),
         ]);
@@ -123,7 +119,6 @@ class TranslationGatewayClientTest extends TestCase
 
         $this->assertSame('purchase', $result->system_code);
         $this->assertSame(['en-US', 'ja-JP'], $result->target_locales);
-        $this->assertSame(['order', 'payment'], $result->modules);
     }
 
     public function test_collect_throw_when_http_failed(): void
@@ -139,7 +134,7 @@ class TranslationGatewayClientTest extends TestCase
         $client = new TranslationGatewayClient($http);
         $client->collect(CollectBatchDto::from([
             'items' => [
-                ['module' => 'order', 'key_name' => 'k', 'source_text' => 'k'],
+                ['key_name' => 'k', 'source_text' => 'k'],
             ],
         ]));
     }
@@ -161,7 +156,7 @@ class TranslationGatewayClientTest extends TestCase
         $client = new TranslationGatewayClient($http);
         $client->collect(CollectBatchDto::from([
             'items' => [
-                ['module' => 'order', 'key_name' => 'k', 'source_text' => 'k'],
+                ['key_name' => 'k', 'source_text' => 'k'],
             ],
         ]));
     }
@@ -176,7 +171,7 @@ class TranslationGatewayClientTest extends TestCase
         $client = new TranslationGatewayClient($http);
         $client->collect(CollectBatchDto::from([
             'items' => [
-                ['module' => 'order', 'key_name' => 'k', 'source_text' => 'k'],
+                ['key_name' => 'k', 'source_text' => 'k'],
             ],
         ]));
     }

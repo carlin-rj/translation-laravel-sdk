@@ -29,7 +29,6 @@ class PackageSyncServiceTest extends TestCase
                         'id' => 1,
                         'translation_key_id' => 101,
                         'locale' => 'en',
-                        'module' => 'order',
                         'key_name' => 'order.status.pending',
                         'translation_text' => 'Pending',
                     ],
@@ -37,7 +36,6 @@ class PackageSyncServiceTest extends TestCase
                         'id' => 2,
                         'translation_key_id' => 102,
                         'locale' => 'en',
-                        'module' => 'order',
                         'key_name' => '',
                         'translation_text' => 'Ignored',
                     ],
@@ -52,7 +50,6 @@ class PackageSyncServiceTest extends TestCase
                         'id' => 3,
                         'translation_key_id' => 103,
                         'locale' => 'en',
-                        'module' => 'order',
                         'key_name' => 'order.status.paid',
                         'translation_text' => 'Paid',
                     ],
@@ -62,16 +59,15 @@ class PackageSyncServiceTest extends TestCase
 
         $cacheRepository = new TranslationCacheRepository(app('cache'));
         $service = new PackageSyncService($gateway, $cacheRepository);
-        $result = $service->sync('en', 'order', 0, 2);
+        $result = $service->sync('en', 0, 2);
 
         $this->assertSame('en', $result->locale);
-        $this->assertSame('order', $result->module);
         $this->assertSame(0, $result->start_cursor);
         $this->assertSame(3, $result->next_cursor);
         $this->assertSame(2, $result->pages);
         $this->assertSame(2, $result->synced_items);
-        $this->assertSame('Pending', $cacheRepository->get('en', 'order', 'order.status.pending'));
-        $this->assertSame('Paid', $cacheRepository->get('en', 'order', 'order.status.paid'));
+        $this->assertSame('Pending', $cacheRepository->get('en', 'order.status.pending'));
+        $this->assertSame('Paid', $cacheRepository->get('en', 'order.status.paid'));
     }
 
     public function test_sync_stops_by_max_pages(): void
@@ -94,7 +90,7 @@ class PackageSyncServiceTest extends TestCase
         ]);
 
         $service = new PackageSyncService($gateway, new TranslationCacheRepository(app('cache')));
-        $result = $service->sync('en', 'order', 0, 2);
+        $result = $service->sync('en', 0, 2);
 
         $this->assertSame(1, $result->pages);
         $this->assertSame(10, $result->next_cursor);
@@ -109,7 +105,6 @@ class PackageSyncServiceTest extends TestCase
                 'system_code' => 'purchase',
                 'source_locale' => 'zh-CN',
                 'target_locales' => ['en-US'],
-                'modules' => ['order'],
             ]));
 
         $service = new PackageSyncService($gateway, new TranslationCacheRepository(app('cache')));
@@ -117,35 +112,22 @@ class PackageSyncServiceTest extends TestCase
 
         $this->assertSame('purchase', $targets->system_code);
         $this->assertSame(['en-US'], $targets->target_locales);
-        $this->assertSame(['order'], $targets->modules);
     }
 
-    public function test_sync_without_module_writes_cache_by_item_module(): void
+    public function test_sync_ignores_items_with_empty_translation_text(): void
     {
-        config()->set('translation_sdk.sync.batch_size', 20);
-        config()->set('translation_sdk.sync.max_pages', 10);
-
         $gateway = new StubGatewayClient([
             FetchPackageIncrementalResultDto::from([
                 'cursor' => 0,
-                'next_cursor' => 2,
+                'next_cursor' => 1,
                 'has_more' => false,
                 'items' => [
                     [
                         'id' => 1,
                         'translation_key_id' => 101,
                         'locale' => 'en',
-                        'module' => 'order',
                         'key_name' => 'order.status.pending',
-                        'translation_text' => 'Pending',
-                    ],
-                    [
-                        'id' => 2,
-                        'translation_key_id' => 102,
-                        'locale' => 'en',
-                        'module' => 'payment',
-                        'key_name' => 'payment.status.paid',
-                        'translation_text' => 'Paid',
+                        'translation_text' => '',
                     ],
                 ],
             ]),
@@ -153,10 +135,9 @@ class PackageSyncServiceTest extends TestCase
 
         $cacheRepository = new TranslationCacheRepository(app('cache'));
         $service = new PackageSyncService($gateway, $cacheRepository);
-        $result = $service->sync('en', null, 0, 50);
+        $result = $service->sync('en', 0, 50);
 
-        $this->assertSame('*', $result->module);
-        $this->assertSame('Pending', $cacheRepository->get('en', 'order', 'order.status.pending'));
-        $this->assertSame('Paid', $cacheRepository->get('en', 'payment', 'payment.status.paid'));
+        $this->assertSame(0, $result->synced_items);
+        $this->assertNull($cacheRepository->get('en', 'order.status.pending'));
     }
 }

@@ -10,9 +10,6 @@ return [
         'timeout' => (float) env('TRANSLATION_GATEWAY_TIMEOUT', 2.0),
     ],
 
-    // `__()` 与扫描结果在未显式传 module 时使用的默认模块。
-    'default_module' => env('TRANSLATION_DEFAULT_MODULE', 'default'),
-
     // 主动扫描与被动采集配置。
     'collect' => [
         // 主动扫描默认批量上报条数。
@@ -53,7 +50,7 @@ return [
             // 单个 Redis 分桶允许的最大条数。
             'redis_max_bucket_size' => (int) env('TRANSLATION_PASSIVE_REDIS_MAX_BUCKET_SIZE', 5000),
 
-            // 相同 `module + key` 缺失项的冷却时间（秒）。
+            // 相同 key 缺失项的冷却时间（秒）。
             'report_cooldown_seconds' => (int) env('TRANSLATION_PASSIVE_REPORT_COOLDOWN_SECONDS', 600),
         ],
     ],

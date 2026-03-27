@@ -14,9 +14,4 @@ class SyncTargetsDto extends BaseDto
      * @var array<int, string>
      */
     public array $target_locales = [];
-
-    /**
-     * @var array<int, string>
-     */
-    public array $modules = [];
 }

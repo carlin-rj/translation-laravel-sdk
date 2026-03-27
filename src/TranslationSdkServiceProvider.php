@@ -17,7 +17,6 @@ use TranslationSdk\Contracts\SdkTranslatorInterface;
 use TranslationSdk\Contracts\TranslationGatewayClientInterface;
 use TranslationSdk\Services\ActiveCollector;
 use TranslationSdk\Services\MissingFlushService;
-use TranslationSdk\Services\ModuleResolver;
 use TranslationSdk\Services\PackageSyncService;
 use TranslationSdk\Services\PackageSyncCursorRepository;
 use TranslationSdk\Services\PassiveCollector;
@@ -42,7 +41,6 @@ class TranslationSdkServiceProvider extends ServiceProvider
 
         $this->app->singleton(TranslationGatewayClientInterface::class, TranslationGatewayClient::class);
         $this->app->singleton(MissingBufferInterface::class, RedisMissingBuffer::class);
-        $this->app->singleton(ModuleResolver::class);
         $this->app->singleton(SourceTextResolver::class, function ($app): SourceTextResolver {
             return new SourceTextResolver($app->make('translation.loader'));
         });
@@ -146,8 +144,7 @@ class TranslationSdkServiceProvider extends ServiceProvider
             $translator->getLoader(),
             $translator->getLocale(),
             $this->app->make(TranslationCacheRepository::class),
-            $this->app->make(PassiveCollector::class),
-            $this->app->make(ModuleResolver::class)
+            $this->app->make(PassiveCollector::class)
         );
         $sdkTranslator->setFallback($translator->getFallback());
         $sdkTranslator->setSelector($translator->getSelector());

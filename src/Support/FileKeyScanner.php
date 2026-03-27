@@ -36,7 +36,6 @@ class FileKeyScanner
      */
     public function scan(
         array $paths,
-        string $defaultModule,
         array $extensions,
         array $excludePaths = []
     ): CollectBatchDto {
@@ -71,13 +70,8 @@ class FileKeyScanner
                     continue;
                 }
 
-                // 同一轮扫描内按 module + key 去重，避免同一个 key 在多个位置重复上报。
-                foreach ($this->extractCollectItems($content, $defaultModule) as $item) {
-                    $module = trim((string) ($item['module'] ?? $defaultModule));
-                    if ($module === '') {
-                        $module = $defaultModule;
-                    }
-
+                // 同一轮扫描内按 key 去重，避免同一个 key 在多个位置重复上报。
+                foreach ($this->extractCollectItems($content) as $item) {
                     $keyName = trim((string) ($item['key_name'] ?? ''));
                     if ($keyName === '') {
                         continue;
@@ -88,13 +82,13 @@ class FileKeyScanner
                         $sourceText = $keyName;
                     }
 
-                    $fingerprint = sha1($module . '|' . $keyName);
+                    $fingerprint = sha1($keyName);
                     if (isset($seen[$fingerprint])) {
                         continue;
                     }
                     $seen[$fingerprint] = true;
 
-                    $items[] = $this->buildCollectItem($module, $keyName, $sourceText);
+                    $items[] = $this->buildCollectItem($keyName, $sourceText);
                 }
             }
         }
@@ -106,9 +100,9 @@ class FileKeyScanner
     }
 
     /**
-     * @return array<int, array{module: string, key_name: string, source_text: string}>
+     * @return array<int, array{key_name: string, source_text: string}>
      */
-    private function extractCollectItems(string $content, string $defaultModule): array
+    private function extractCollectItems(string $content): array
     {
         $items = [];
 
@@ -120,7 +114,7 @@ class FileKeyScanner
                 if ($keyText === null || $keyText === '') {
                     continue;
                 }
-                $items[] = $this->buildCollectItem($defaultModule, $keyText);
+                $items[] = $this->buildCollectItem($keyText);
             }
         }
 
@@ -131,17 +125,8 @@ class FileKeyScanner
                 if ($keyText === '') {
                     continue;
                 }
-                $items[] = $this->buildCollectItem($defaultModule, $keyText);
+                $items[] = $this->buildCollectItem($keyText);
             }
-        }
-
-        // tc 与 __ 参数保持一致，只额外支持 module 参数。
-        foreach ($this->extractFunctionCalls($content, 'tc') as $callArgumentsText) {
-            $item = $this->parseTcCollectItem($callArgumentsText, $defaultModule);
-            if ($item === null) {
-                continue;
-            }
-            $items[] = $item;
         }
 
         return $items;
@@ -414,52 +399,7 @@ class FileKeyScanner
     }
 
     /**
-     * `tc()` 只比 `__()` 多一个 module 参数，所以解析逻辑也尽量保持简单。
-     *
-     * @return array{module: string, key_name: string, source_text: string}|null
-     */
-    private function parseTcCollectItem(string $argumentsText, string $defaultModule): ?array
-    {
-        $arguments = $this->splitArguments($argumentsText);
-        if ($arguments === []) {
-            return null;
-        }
-
-        $namedArguments = [];
-        $positionalArguments = [];
-        foreach ($arguments as $argument) {
-            $named = $this->parseNamedArgument($argument);
-            if ($named === null) {
-                $positionalArguments[] = $argument;
-                continue;
-            }
-            $namedArguments[$named['name']] = $named['value'];
-        }
-
-        $keyToken = $namedArguments['key'] ?? ($positionalArguments[0] ?? null);
-        $keyName = $this->parseStringLiteral($keyToken);
-        if ($keyName === null || $keyName === '') {
-            return null;
-        }
-
-        $module = $defaultModule;
-
-        $remainingPositional = isset($namedArguments['key']) ? $positionalArguments : array_slice($positionalArguments, 1);
-        $moduleArgText = $this->parseStringLiteral($remainingPositional[2] ?? null);
-        if ($moduleArgText !== null && $moduleArgText !== '') {
-            $module = $moduleArgText;
-        }
-
-        $namedModule = $this->parseStringLiteral($namedArguments['module'] ?? null);
-        if ($namedModule !== null && $namedModule !== '') {
-            $module = $namedModule;
-        }
-
-        return $this->buildCollectItem($module, $keyName);
-    }
-
-    /**
-     * 解析 PHP 8 命名参数，例如 `module: 'order'`。
+     * 解析 PHP 8 命名参数，例如 `key: 'order.status.pending'`。
      *
      * @return array{name: string, value: string}|null
      */
@@ -551,12 +491,11 @@ class FileKeyScanner
     /**
      * 统一构建扫描产出的收集项，减少重复数组结构。
      *
-     * @return array{module: string, key_name: string, source_text: string}
+     * @return array{key_name: string, source_text: string}
      */
-    private function buildCollectItem(string $module, string $keyName, ?string $sourceText = null): array
+    private function buildCollectItem(string $keyName, ?string $sourceText = null): array
     {
         return [
-            'module' => $module,
             'key_name' => $keyName,
             'source_text' => $this->resolveSourceText($keyName, $sourceText),
         ];

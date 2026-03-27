@@ -25,22 +25,19 @@ class SyncPackageCommandTest extends TestCase
                 'system_code' => 'purchase',
                 'source_locale' => 'zh-CN',
                 'target_locales' => ['en-US', 'ja-JP'],
-                'modules' => ['order'],
             ]));
         $syncCalls = [];
         $syncService->expects($this->exactly(2))
             ->method('sync')
             ->willReturnCallback(static function (
                 string $locale,
-                ?string $module,
                 int $cursor,
                 ?int $limit
             ) use (&$syncCalls): PackageSyncResultDto {
-                $syncCalls[] = [$locale, $module, $cursor, $limit];
+                $syncCalls[] = [$locale, $cursor, $limit];
                 if (count($syncCalls) === 1) {
                     return PackageSyncResultDto::from([
                         'locale' => 'en-US',
-                        'module' => '*',
                         'start_cursor' => 10,
                         'next_cursor' => 15,
                         'pages' => 1,
@@ -50,7 +47,6 @@ class SyncPackageCommandTest extends TestCase
 
                 return PackageSyncResultDto::from([
                     'locale' => 'ja-JP',
-                    'module' => '*',
                     'start_cursor' => 20,
                     'next_cursor' => 25,
                     'pages' => 1,
@@ -65,16 +61,16 @@ class SyncPackageCommandTest extends TestCase
         $cursorGetCalls = [];
         $cursorRepository->expects($this->exactly(2))
             ->method('getCursor')
-            ->willReturnCallback(static function (string $locale, ?string $module) use (&$cursorGetCalls): int {
-                $cursorGetCalls[] = [$locale, $module];
+            ->willReturnCallback(static function (string $locale) use (&$cursorGetCalls): int {
+                $cursorGetCalls[] = [$locale];
 
                 return count($cursorGetCalls) === 1 ? 10 : 20;
             });
         $cursorSaveCalls = [];
         $cursorRepository->expects($this->exactly(2))
             ->method('saveCursor')
-            ->willReturnCallback(static function (string $locale, ?string $module, int $cursor) use (&$cursorSaveCalls): void {
-                $cursorSaveCalls[] = [$locale, $module, $cursor];
+            ->willReturnCallback(static function (string $locale, int $cursor) use (&$cursorSaveCalls): void {
+                $cursorSaveCalls[] = [$locale, $cursor];
             });
 
         app()->instance(PackageSyncService::class, $syncService);
@@ -84,16 +80,16 @@ class SyncPackageCommandTest extends TestCase
 
         $this->assertSame(0, $exit);
         $this->assertSame([
-            ['en-US', null, 10, null],
-            ['ja-JP', null, 20, null],
+            ['en-US', 10, null],
+            ['ja-JP', 20, null],
         ], $syncCalls);
         $this->assertSame([
-            ['en-US', null],
-            ['ja-JP', null],
+            ['en-US'],
+            ['ja-JP'],
         ], $cursorGetCalls);
         $this->assertSame([
-            ['en-US', null, 15],
-            ['ja-JP', null, 25],
+            ['en-US', 15],
+            ['ja-JP', 25],
         ], $cursorSaveCalls);
     }
 
@@ -106,10 +102,9 @@ class SyncPackageCommandTest extends TestCase
         $syncService->expects($this->never())->method('fetchSyncTargets');
         $syncService->expects($this->once())
             ->method('sync')
-            ->with('en-US', 'order', 100, 50)
+            ->with('en-US', 100, 50)
             ->willReturn(PackageSyncResultDto::from([
                 'locale' => 'en-US',
-                'module' => 'order',
                 'start_cursor' => 100,
                 'next_cursor' => 150,
                 'pages' => 2,
@@ -128,7 +123,6 @@ class SyncPackageCommandTest extends TestCase
 
         $exit = Artisan::call('translation-sdk:sync-package', [
             '--locale' => ['en-US'],
-            '--module' => 'order',
             '--cursor' => 100,
             '--limit' => 50,
         ]);
@@ -146,14 +140,12 @@ class SyncPackageCommandTest extends TestCase
             ->method('fetchSyncTargets')
             ->willReturn(SyncTargetsDto::from([
                 'target_locales' => ['en-US'],
-                'modules' => ['order'],
             ]));
         $syncService->expects($this->once())
             ->method('sync')
-            ->with('en-US', null, 0, null)
+            ->with('en-US', 0, null)
             ->willReturn(PackageSyncResultDto::from([
                 'locale' => 'en-US',
-                'module' => '*',
                 'start_cursor' => 0,
                 'next_cursor' => 11,
                 'pages' => 1,
@@ -167,7 +159,7 @@ class SyncPackageCommandTest extends TestCase
         $cursorRepository->expects($this->never())->method('getCursor');
         $cursorRepository->expects($this->once())
             ->method('saveCursor')
-            ->with('en-US', null, 11);
+            ->with('en-US', 11);
 
         app()->instance(PackageSyncService::class, $syncService);
         app()->instance(PackageSyncCursorRepository::class, $cursorRepository);

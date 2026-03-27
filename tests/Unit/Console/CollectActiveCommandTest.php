@@ -7,7 +7,6 @@ namespace TranslationSdk\Tests\Unit\Console;
 use Illuminate\Support\Facades\Artisan;
 use TranslationSdk\Dto\ActiveCollectResultDto;
 use TranslationSdk\Services\ActiveCollector;
-use TranslationSdk\Services\ModuleResolver;
 use TranslationSdk\Tests\TestCase;
 
 class CollectActiveCommandTest extends TestCase
@@ -20,7 +19,7 @@ class CollectActiveCommandTest extends TestCase
             ->getMock();
         $collector->expects($this->once())
             ->method('collect')
-            ->with(['/app', '/resources'], 'order', 50)
+            ->with(['/app', '/resources'], 50)
             ->willReturn(ActiveCollectResultDto::from([
                 'scanned_files' => 2,
                 'discovered_items' => 3,
@@ -28,19 +27,9 @@ class CollectActiveCommandTest extends TestCase
                 'pushed_items' => 3,
             ]));
 
-        $resolver = $this->getMockBuilder(ModuleResolver::class)
-            ->onlyMethods(['resolve'])
-            ->getMock();
-        $resolver->expects($this->once())
-            ->method('resolve')
-            ->with('order')
-            ->willReturn('order');
-
         app()->instance(ActiveCollector::class, $collector);
-        app()->instance(ModuleResolver::class, $resolver);
 
         $exit = Artisan::call('translation-sdk:collect-active', [
-            '--module' => 'order',
             '--path' => ['/app', '/resources'],
             '--batch' => 50,
         ]);

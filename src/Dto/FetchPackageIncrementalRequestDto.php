@@ -9,8 +9,6 @@ class FetchPackageIncrementalRequestDto extends BaseDto
 {
     public string $locale = '';
 
-    public ?string $module = null;
-
     public int $cursor = 0;
 
     public int $limit = 200;

@@ -28,12 +28,11 @@ class PackageSyncService
         $this->cacheRepository = $cacheRepository;
     }
 
-    public function sync(string $locale, ?string $module = null, int $cursor = 0, ?int $limit = null): PackageSyncResultDto
+    public function sync(string $locale, int $cursor = 0, ?int $limit = null): PackageSyncResultDto
     {
         $batchSize = $limit ?? (int) config('translation_sdk.sync.batch_size', 200);
         $safeLimit = max(1, min(1000, $batchSize));
         $maxPages = max(1, (int) config('translation_sdk.sync.max_pages', 1000));
-        $resolvedModule = $this->resolveModule($module);
 
         $currentCursor = max(0, $cursor);
         $pages = 0;
@@ -44,12 +43,11 @@ class PackageSyncService
             $pages++;
             $page = $this->gatewayClient->fetchPackageIncremental(FetchPackageIncrementalRequestDto::from([
                 'locale' => $locale,
-                'module' => $resolvedModule,
                 'cursor' => $currentCursor,
                 'limit' => $safeLimit,
             ]));
 
-            $mapByModule = [];
+            $translationMap = [];
             foreach ($page->items as $item) {
                 $keyName = ($item->key_name ?? '');
                 $translationText = ($item->translation_text ?? '');
@@ -57,19 +55,12 @@ class PackageSyncService
                     continue;
                 }
 
-                // all-module 同步时，优先使用远程返回的 item module。
-                $itemModule = trim(($item->module ?? ''));
-                if ($itemModule === '') {
-                    $itemModule = $resolvedModule ?? config('translation_sdk.default_module', 'default');
-                }
-
-                $mapByModule[$itemModule][$keyName] = $translationText;
+                $translationMap[$keyName] = $translationText;
                 $syncedItems++;
             }
 
-            // 单页内先按模块分桶，再写入缓存，避免不同模块互相污染。
-            foreach ($mapByModule as $itemModule => $map) {
-                $this->cacheRepository->mergeTranslations($locale, $itemModule, $map);
+            if ($translationMap !== []) {
+                $this->cacheRepository->mergeTranslations($locale, $translationMap);
             }
 
             $currentCursor = $page->next_cursor;
@@ -80,7 +71,6 @@ class PackageSyncService
 
         return PackageSyncResultDto::from([
             'locale' => $locale,
-            'module' => $resolvedModule ?? '*',
             'start_cursor' => $cursor,
             'next_cursor' => $currentCursor,
             'pages' => $pages,
@@ -93,13 +83,4 @@ class PackageSyncService
         return $this->gatewayClient->fetchSyncTargets();
     }
 
-    /**
-     * 远程同步接口允许 module 为空，表示同步全部模块。
-     */
-    private function resolveModule(?string $module): ?string
-    {
-        $moduleText = trim($module ?? '');
-
-        return $moduleText === '' ? null : $moduleText;
-    }
 }

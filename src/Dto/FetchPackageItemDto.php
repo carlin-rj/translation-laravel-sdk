@@ -13,8 +13,6 @@ class FetchPackageItemDto extends BaseDto
 
     public string $locale = '';
 
-    public ?string $module = null;
-
     public ?string $key_name = null;
 
     public ?string $translation_text = null;
