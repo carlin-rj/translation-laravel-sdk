@@ -163,7 +163,7 @@ class SdkTranslator extends LaravelTranslator implements SdkTranslatorInterface
         ?string $locale = null,
         ?string $module = null
     ): string {
-        $resolvedLocale = $this->localeForChoice($locale);
+        $resolvedLocale = $this->localeForChoice($key, $locale);
         $line = $this->getWithModule($key, $replace, $resolvedLocale, $module);
 
         if (is_countable($number)) {
